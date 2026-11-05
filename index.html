@@ -41,11 +41,12 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:8px;borde
 <div class="fields">
 <label>コート数<input id="courts" type="number" min="1" max="30" value="3"></label>
 <label>参加人数<input id="players" type="number" min="4" max="200" value="20"></label>
+<label>試合数<input id="totalMatches" type="number" min="1" max="1000" value="100"></label>
 </div>
-<p class="hint">合計100試合。出場回数が少ない人を優先し、同数なら番号の小さい順に選びます。選ばれた人のペア・対戦相手はランダムです。</p>
-<button class="primary" id="generate" type="button">100試合を作成</button><p id="error" class="hint" style="color:#b42318"></p>
+<p class="hint">指定した試合数を作成します。出場回数が少ない人を優先し、同数なら番号の小さい順に選びます。選ばれた人のペア・対戦相手はランダムです。</p>
+<button class="primary" id="generate" type="button">組み合わせを作成</button><p id="error" class="hint" style="color:#b42318"></p>
 </section>
-<section class="panel" id="results"><div class="hint">コート数と参加人数を入力して「100試合を作成」を押してください。</div></section>
+<section class="panel" id="results"><div class="hint">コート数・参加人数・試合数を入力して「組み合わせを作成」を押してください。</div></section>
 </main>
 <script>
 (()=>{
@@ -53,15 +54,16 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:8px;borde
 const $=id=>document.getElementById(id);
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function draw(){
-const courts=Number($('courts').value),n=Number($('players').value),total=100;
+const courts=Number($('courts').value),n=Number($('players').value),total=Number($('totalMatches').value);
 $('error').textContent='';
 if(!Number.isInteger(courts)||courts<1||courts>30){$('error').textContent='コート数は1〜30で入力してください。';return}
 if(!Number.isInteger(n)||n<4||n>200){$('error').textContent='参加人数は4〜200で入力してください。';return}
+if(!Number.isInteger(total)||total<1||total>1000){$('error').textContent='試合数は1〜1000で入力してください。';return}
 const per=Math.min(courts,Math.floor(n/4)),rounds=Math.ceil(total/per);
 const played=Array(n+1).fill(0);let matchNo=0;
-let h='<div class="toolbar"><b>抽選結果：合計100試合</b><span><button class="secondary" id="again" type="button">再抽選</button> <button class="secondary" id="print" type="button">印刷</button></span></div>';
-h+='<div class="stats"><div class="stat"><small>コート数</small><b>'+courts+'</b></div><div class="stat"><small>参加人数</small><b>'+n+'</b></div><div class="stat"><small>合計試合数</small><b>100</b></div><div class="stat"><small>完了試合数</small><b id="doneCount">0</b></div></div>';
-h+='<div class="hint" id="progressText">試合完了状況：0 / 100</div><div class="progress"><div class="bar" id="progressBar"></div></div>';
+let h='<div class="toolbar"><b>抽選結果：合計'+total+'試合</b><span><button class="secondary" id="again" type="button">再抽選</button> <button class="secondary" id="print" type="button">印刷</button></span></div>';
+h+='<div class="stats"><div class="stat"><small>コート数</small><b>'+courts+'</b></div><div class="stat"><small>参加人数</small><b>'+n+'</b></div><div class="stat"><small>合計試合数</small><b>'+total+'</b></div><div class="stat"><small>完了試合数</small><b id="doneCount">0</b></div></div>';
+h+='<div class="hint" id="progressText">試合完了状況：0 / '+total+'</div><div class="progress"><div class="bar" id="progressBar"></div></div>';
 for(let r=1;r<=rounds;r++){
 const m=Math.min(per,total-matchNo),slots=m*4;
 const chosen=Array.from({length:n},(_,i)=>i+1).sort((a,b)=>played[a]-played[b]||a-b).slice(0,slots);
@@ -80,7 +82,7 @@ h+='</table></div>';
 $('results').innerHTML=h;
 function updateProgress(){
 const checks=[...document.querySelectorAll('.match-check')],done=checks.filter(x=>x.checked).length;
-$('doneCount').textContent=done;$('progressText').textContent='試合完了状況：'+done+' / 100';$('progressBar').style.width=(done/100*100)+'%';
+$('doneCount').textContent=done;$('progressText').textContent='試合完了状況：'+done+' / '+total;$('progressBar').style.width=(done/total*100)+'%';
 checks.forEach(x=>{const id=x.dataset.match,card=$('match-'+id),label=$('done-text-'+id);card.classList.toggle('done',x.checked);label.textContent=x.checked?'完了':''});
 }
 document.querySelectorAll('.match-check').forEach(x=>x.addEventListener('change',updateProgress));
