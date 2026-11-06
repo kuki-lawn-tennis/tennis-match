@@ -200,7 +200,7 @@
         </label>
       </div>
       <p class="hint">
-        指定した試合数を作成します。出場回数が少ない人を優先し、同数の中ではランダムに選びます。
+        試合数はコート数の倍数に切り上げ、全ラウンドで全コートを使います。出場回数が少ない人を優先し、同数の中ではランダムに選びます。
         ペア・対戦相手もランダムですが、同じ組み合わせがなるべく重ならないよう調整します。
       </p>
       <button class="primary" id="generate" type="button">組み合わせを作成</button>
@@ -361,15 +361,18 @@
         </div>`;
     }
 
-    function renderResults(courts, n, total, schedule) {
+    function renderResults(courts, n, total, requested, schedule) {
       $('results').innerHTML = `
         <div class="toolbar">
-          <b>抽選結果：合計${total}試合</b>
+          <b>抽選結果：${total / courts}ラウンド・合計${total}試合</b>
           <span>
             <button class="secondary" data-action="again" type="button">再抽選</button>
             <button class="secondary" data-action="print" type="button">印刷</button>
           </span>
         </div>
+        ${requested !== total
+          ? `<p class="hint">入力された${requested}試合を、全コートを使い切る${total}試合（${total / courts}ラウンド）に調整しました。</p>`
+          : ''}
         <div class="stats">
           <div class="stat"><small>コート数</small><b>${courts}</b></div>
           <div class="stat"><small>参加人数</small><b>${n}</b></div>
@@ -406,7 +409,13 @@
       try {
         const courts = readInt('courts', 1, 30, 'コート数');
         const n      = readInt('players', 4, 200, '参加人数');
-        const total  = readInt('totalMatches', 1, 1000, '試合数');
+        const requested = readInt('totalMatches', 1, 1000, '試合数');
+
+        // 全コートを同時に使うには、1コートあたり4人が必要
+        if (n < courts * 4) {
+          throw new Error('コート数' + courts + 'には最低' + (courts * 4) + '人必要です。'
+            + 'コート数を減らすか、参加人数を増やしてください。');
+        }
 
         // 完了チェックが1つでもあれば、消える前に確認する
         if (document.querySelector('.match-check:checked') &&
@@ -414,7 +423,10 @@
           return;
         }
 
-        renderResults(courts, n, total, buildSchedule(courts, n, total));
+        // 試合数は「コート数の倍数」に切り上げ、最終ラウンドも全コートを使う
+        const total = Math.ceil(requested / courts) * courts;
+
+        renderResults(courts, n, total, requested, buildSchedule(courts, n, total));
         $('results').scrollIntoView({ behavior: 'smooth' });
       } catch (e) {
         $('error').textContent = e.message;
