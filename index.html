@@ -8,7 +8,6 @@
     :root {
       --green: #176b45;
       --green-dark: #145638;
-      --green-bar: #238653;
       --bg: #f4f7f5;
       --text: #203027;
       --muted: #64736a;
@@ -102,15 +101,6 @@
     .stat  { background: var(--soft); padding: 9px 12px; border-radius: 8px; }
     .stat small { display: block; color: var(--muted); font-size: 11px; }
     .stat b { font-size: 19px; }
-
-    .progress {
-      height: 10px;
-      background: #e5ece7;
-      border-radius: 10px;
-      overflow: hidden;
-      margin-top: 8px;
-    }
-    .bar { height: 100%; width: 0; background: var(--green-bar); transition: width .2s; }
 
     /* ---------- ラウンド・試合 ---------- */
     .round { margin-top: 18px; }
@@ -227,7 +217,6 @@
     'use strict';
 
     const $ = id => document.getElementById(id);
-    let totalMatches = 0;
     let playerCount = 0;
     let matchByNo = new Map();
 
@@ -252,7 +241,7 @@
     /* ---------- 抽選ロジック ---------- */
     function buildSchedule(courts, n, total) {
       const ids = Array.from({ length: n }, (_, i) => i + 1);
-      const played = Array(n + 1).fill(0);
+      const played = Array(n + 1).fill(0); // 出場回数（選出の優先度用）
       const partner = new Uint16Array((n + 1) * (n + 1));  // ペアになった回数
       const opponent = new Uint16Array((n + 1) * (n + 1)); // 対戦した回数
       const at = (a, b) => (a < b ? a * (n + 1) + b : b * (n + 1) + a);
@@ -320,8 +309,7 @@
         rounds.push({ matches, waiting: ids.filter(x => !chosenSet.has(x)) });
       }
 
-      const maxOf = arr => arr.reduce((m, v) => Math.max(m, v), 0);
-      return { rounds, played, maxPartner: maxOf(partner), maxOpponent: maxOf(opponent) };
+      return { rounds };
     }
 
     /* ---------- 描画 ---------- */
@@ -357,27 +345,17 @@
         </div>`;
     }
 
-    function renderCountTable(schedule) {
-      const counts = schedule.played.slice(1);
-      const min = Math.min(...counts);
-      const max = Math.max(...counts);
-      const rows = counts
-        .map((count, i) => `
+    function renderCountTable(n) {
+      const rows = Array.from({ length: n }, (_, i) => `
           <tr>
             <td>${i + 1}番</td>
-            <td>${count}回</td>
             <td class="done-cell" id="done-count-${i + 1}">0回</td>
-          </tr>`)
-        .join('');
+          </tr>`).join('');
       return `
         <div class="round">
           <b>参加者別 試合数</b>
-          <p class="hint">
-            予定：最多 ${max} 回／最少 ${min} 回（差 ${max - min} 回）<br>
-            同じペアの最多 ${schedule.maxPartner} 回／同じ対戦相手の最多 ${schedule.maxOpponent} 回
-          </p>
           <table>
-            <thead><tr><th>参加者番号</th><th>予定試合数</th><th>完了試合数</th></tr></thead>
+            <thead><tr><th>参加者番号</th><th>完了試合数</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
         </div>`;
@@ -398,10 +376,8 @@
           <div class="stat"><small>合計試合数</small><b>${total}</b></div>
           <div class="stat"><small>完了試合数</small><b id="doneCount">0</b></div>
         </div>
-        <div class="hint" id="progressText">試合完了状況：0 / ${total}</div>
-        <div class="progress"><div class="bar" id="progressBar"></div></div>
         ${schedule.rounds.map(renderRound).join('')}
-        ${renderCountTable(schedule)}`;
+        ${renderCountTable(n)}`;
 
       playerCount = n;
       matchByNo = new Map(schedule.rounds.flatMap(r => r.matches).map(m => [m.no, m]));
@@ -411,8 +387,6 @@
       const checks = [...document.querySelectorAll('.match-check')];
       const done = checks.filter(x => x.checked).length;
       $('doneCount').textContent = done;
-      $('progressText').textContent = '試合完了状況：' + done + ' / ' + totalMatches;
-      $('progressBar').style.width = (done / totalMatches * 100) + '%';
       checks.forEach(x => $('match-' + x.dataset.match).classList.toggle('done', x.checked));
 
       // 参加者別の完了試合数：チェック状態から毎回数え直す（外せば自動で減算）
@@ -440,7 +414,6 @@
           return;
         }
 
-        totalMatches = total;
         renderResults(courts, n, total, buildSchedule(courts, n, total));
         $('results').scrollIntoView({ behavior: 'smooth' });
       } catch (e) {
