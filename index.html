@@ -60,13 +60,10 @@
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 12px;
-      font-size: 17px;
+      font-size: 18px;
     }
 
-    label { 
-      font-weight: 650; 
-      font-size: 17px;
-    }
+    label { font-weight: 650; font-size: 18px; }
 
     input[type=number] {
       display: block;
@@ -75,7 +72,7 @@
       padding: 12px;
       border: 1px solid #b9c8bf;
       border-radius: 8px;
-      font-size: 17px;
+      font-size: 18px;
     }
 
     .error { color: var(--error); font-size: 14px; font-weight: 700; min-height: 1.6em; margin: 8px 0 0; }
@@ -223,7 +220,8 @@
         </label>
       </div>
       <p class="hint">
-        試合数はコート数の倍数に切り上げ、全ラウンドで全コートを使います。ラウンドは1つずつ作成します。次のラウンドは、完了にした試合の実績（直前のラウンドは出場済み扱い）をもとに、出場回数が少ない人を優先して選びます（同数の中ではランダム）。
+        試合数はコート数の倍数に切り上げ、全ラウンドで全コートを使います。ラウンドは1つずつ作成します。
+        次のラウンドは、完了にした試合の実績（直前のラウンドは出場済み扱い）をもとに、出場回数が少ない人を優先して選びます（同数の中ではランダム）。
       </p>
       <button class="primary" id="generate" type="button">組み合わせを作成</button>
       <p id="error" class="hint error" role="alert"></p>
@@ -284,12 +282,18 @@
         opponent[at(a, c)]++; opponent[at(a, d)]++;
         opponent[at(b, c)]++; opponent[at(b, d)]++;
       });
-      return { played, partner, opponent, at };
+
+      // 直近で連続して待機した回数（出場回数が同じ人の中での優先順に使う）
+      const rest = Array(n + 1).fill(0);
+      for (let p = 1; p <= n; p++) {
+        for (let i = session.rounds.length - 1; i >= 0 && session.rounds[i].waiting.includes(p); i--) rest[p]++;
+      }
+      return { played, rest, partner, opponent, at };
     }
 
     // 1ラウンド分を作る（実績 stats をもとに選出と並べ替え）
     function createRound(stats, courts, n, roundIndex) {
-      const { played, partner, opponent, at } = stats;
+      const { played, rest, partner, opponent, at } = stats;
       const ids = Array.from({ length: n }, (_, i) => i + 1);
 
       // 並べ方の悪さ：同じペアは重く、同じ対戦相手は軽くカウント
@@ -339,10 +343,11 @@
         return best;
       }
 
-      // 出場回数が少ない順に必要人数を選ぶ。同数の中はランダム
-      // （事前にシャッフルしてから安定ソートする）
+      // 出場回数が少ない順に必要人数を選ぶ。
+      // 同数の中では、直前のラウンドで待機していた人（連続待機が長い人）を優先し、
+      // それも同じならランダム（事前にシャッフルしてから安定ソートする）
       const chosen = shuffle(ids)
-        .sort((a, b) => played[a] - played[b])
+        .sort((a, b) => played[a] - played[b] || rest[b] - rest[a])
         .slice(0, courts * 4);
       const chosenSet = new Set(chosen);
 
@@ -508,7 +513,7 @@
       if (armed && armed.btn === btn) { disarm(); return true; } // 2回目の押下で実行
       disarm();
       armed = { btn, label: btn.textContent };
-      btn.textContent = 'もう一度押すと再組合';
+      btn.textContent = '消えます。もう一度押す';
       armTimer = setTimeout(disarm, 4000);
       return false;
     }
