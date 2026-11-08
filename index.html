@@ -513,7 +513,7 @@
       if (armed && armed.btn === btn) { disarm(); return true; } // 2回目の押下で実行
       disarm();
       armed = { btn, label: btn.textContent };
-      btn.textContent = '消えます。もう一度押す';
+      btn.textContent = 'もう一度押すと再組合';
       armTimer = setTimeout(disarm, 4000);
       return false;
     }
