@@ -16,7 +16,9 @@
       --error: #b42318;
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
@@ -32,12 +34,12 @@
       color: #fff;
       padding: 20px 16px;
     }
-    header h1 { 
-      margin: 0; 
+    header h1 {
+      margin: 0;
       font-size: 21px;
     }
-    header .hint { 
-      color: #fff; 
+    header .hint {
+      color: #fff;
       margin: 4px 0 0;
     }
 
@@ -66,12 +68,11 @@
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 12px;
-      font-size: 18px;
     }
 
-    label { 
-      font-weight: 650; 
-      font-size: 18px; 
+    label {
+      font-weight: 650;
+      font-size: 18px;
     }
 
     input[type=number] {
@@ -92,7 +93,9 @@
       margin-top: 14px;
       font-size: 18px;
     }
-    .mode-title { font-weight: 650; }
+    .mode-title {
+      font-weight: 650;
+    }
     .mode-option {
       display: flex;
       align-items: center;
@@ -106,12 +109,12 @@
       accent-color: var(--green);
     }
 
-    .error { 
-      color: var(--error); 
-      font-size: 14px; 
-      font-weight: 700; 
-      min-height: 1.6em; 
-      margin: 8px 0 0; 
+    .error {
+      color: var(--error);
+      font-size: 14px;
+      font-weight: 700;
+      min-height: 1.6em;
+      margin: 8px 0 0;
     }
 
     /* ---------- ボタン ---------- */
@@ -123,15 +126,15 @@
       font-weight: 700;
       cursor: pointer;
     }
-    .primary   { 
-      background: var(--green); 
-      color: #fff; 
-      width: 100%; 
-      margin-top: 14px; 
+    .primary {
+      background: var(--green);
+      color: #fff;
+      width: 100%;
+      margin-top: 14px;
     }
-    .secondary { 
-      background: #e8f0eb; 
-      color: var(--green-dark); 
+    .secondary {
+      background: #e8f0eb;
+      color: var(--green-dark);
     }
 
     /* ---------- 結果ヘッダー ---------- */
@@ -143,28 +146,28 @@
       flex-wrap: wrap;
     }
 
-    .stats { 
-      display: flex; 
-      gap: 8px; 
-      flex-wrap: wrap; 
-      margin: 12px 0; 
+    .stats {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 12px 0;
     }
-    .stat  { 
-      background: var(--soft); 
-      padding: 9px 12px; 
-      border-radius: 8px; 
+    .stat {
+      background: var(--soft);
+      padding: 9px 12px;
+      border-radius: 8px;
     }
-    .stat small { 
-      display: block; 
-      color: var(--muted); 
-      font-size: 11px; 
+    .stat small {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
     }
-    .stat b { 
-      font-size: 19px; 
+    .stat b {
+      font-size: 19px;
     }
 
     /* ---------- ラウンド・試合 ---------- */
-    .round { 
+    .round {
       margin-top: 18px;
       font-size: 20px;
     }
@@ -178,24 +181,20 @@
       cursor: pointer;
       margin: 4px 0 12px;
     }
-    .all-check-label input { 
-      width: 23px; 
-      height: 23px; 
-      accent-color: var(--green); 
+    .all-check-label input {
+      width: 23px;
+      height: 23px;
+      accent-color: var(--green);
     }
 
-    .next-area { 
-      margin-top: 18px; 
+    .next-area {
+      margin-top: 18px;
     }
-    .next-area .primary { 
-      margin-top: 0; 
+    .next-area .primary {
+      margin-top: 0;
     }
-    .next-area .primary:disabled { 
-      background: #b9c8bf; 
-      cursor: not-allowed; 
-    }
-    .next-area .hint { 
-      margin: 6px 0 0; 
+    .next-area .hint {
+      margin: 6px 0 0;
       text-align: center;
     }
 
@@ -204,9 +203,17 @@
       border-radius: 10px;
       padding: 11px;
       margin: 8px 0;
+      cursor: pointer;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
-    .match.done { 
-      background: #f0f7f2; 
+    .match:focus-visible {
+      outline: 3px solid var(--green);
+      outline-offset: 2px;
+    }
+    .match.done {
+      background: #f0f7f2;
       border-color: #9bc5a8;
     }
 
@@ -232,82 +239,96 @@
       font-weight: 700;
       font-size: 30px;
     }
-    .vs { 
-      font-size: 12px; 
-      color: #78857d; 
+    .vs {
+      font-size: 12px;
+      color: #78857d;
     }
 
     .match-bottom {
       display: flex;
-      justify-content: space-between;
+      justify-content: center;
       align-items: center;
       gap: 8px;
       margin-top: 11px;
       padding-top: 9px;
       border-top: 1px solid #e1e9e3;
     }
-    .complete-label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    .tap-hint {
       font-size: 14px;
-      cursor: pointer;
+      color: var(--muted);
     }
-    .complete-label input { 
-      width: 21px; 
-      height: 21px; 
-      accent-color: var(--green);
+    .match.done .tap-hint {
+      display: none;
     }
 
-    .done-badge { 
-      display: none; 
-      font-size: 12px; 
-      font-weight: 700; 
-      color: var(--green); 
+    .done-badge {
+      display: none;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--green);
     }
-    .match.done .done-badge { 
-      display: inline; 
+    .match.done .done-badge {
+      display: inline;
     }
 
-    .waiting { 
-      font-size: 16px; 
-      color: #5d6c62; 
-      line-height: 1.6; 
-      margin-top: 8px; 
+    .waiting {
+      font-size: 16px;
+      color: #5d6c62;
+      line-height: 1.6;
+      margin-top: 8px;
     }
 
     /* ---------- 出場回数表 ---------- */
-    table { 
-      width: 100%; 
-      border-collapse: collapse; 
-      font-size: 20px; 
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 20px;
     }
-    th, td { 
-      padding: 8px; 
-      border-bottom: 1px solid var(--border); 
-      text-align: center; 
+    th, td {
+      padding: 8px;
+      border-bottom: 1px solid var(--border);
+      text-align: center;
     }
-    td.done-cell { 
-      font-weight: 700; 
-      color: var(--green); 
+    td.done-cell {
+      font-weight: 700;
+      color: var(--green);
     }
-    .count-title { 
-      display: block; 
+    .count-title {
+      display: block;
       text-align: center;
       font-size: 22px;
     }
 
     @media (max-width: 500px) {
-      .fields { grid-template-columns: 1fr; }
+      .fields {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media print {
-      header { background: #fff; color: #000; }
-      header .hint { color: #000; }
-      main { margin: 0; }
-      .panel:first-child, .toolbar button, .match-bottom, .all-check-label, .next-area { display: none; }
-      .panel { border: 0; }
-      .match { break-inside: avoid; }
+      header {
+        background: #fff;
+        color: #000;
+      }
+      header .hint {
+        color: #000;
+      }
+      main {
+        margin: 0;
+      }
+      .panel:first-child,
+      .toolbar button,
+      .match-bottom,
+      .all-check-label,
+      .next-area {
+        display: none;
+      }
+      .panel {
+        border: 0;
+      }
+      .match {
+        break-inside: avoid;
+      }
     }
   </style>
 </head>
@@ -368,8 +389,10 @@
       return a;
     }
 
-    function readInt(id, min, max, label) {
-      const value = Number($(id).value);
+    // 範囲は入力欄の min / max（HTML側）を使う
+    function readInt(id, label) {
+      const el = $(id);
+      const min = Number(el.min), max = Number(el.max), value = Number(el.value);
       if (!Number.isInteger(value) || value < min || value > max) {
         throw new Error(label + 'は' + min + '〜' + max + 'で入力してください。');
       }
@@ -522,7 +545,7 @@
 
     function renderMatch(m) {
       return `
-        <div class="match" id="match-${m.no}">
+        <div class="match" id="match-${m.no}" role="button" tabindex="0" aria-pressed="false">
           <div class="match-head"><span>第${m.no}試合</span><b>コート${m.court}</b></div>
           <div class="teams">
             <div class="team">${pairText(m.teamA)}</div>
@@ -530,10 +553,9 @@
             <div class="team">${pairText(m.teamB)}</div>
           </div>
           <div class="match-bottom">
-            <label class="complete-label">
-              <input type="checkbox" class="match-check" data-match="${m.no}"> 試合完了
-            </label>
-            <span class="done-badge">完了</span>
+            <span class="tap-hint">タッチで完了</span>
+            <span class="done-badge">✔ 完了（もう一度タッチで取消）</span>
+            <input type="checkbox" class="match-check" data-match="${m.no}" hidden>
           </div>
         </div>`;
     }
@@ -636,19 +658,24 @@
 
     function updateProgress() {
       const checks = [...document.querySelectorAll('.match-check')];
-      const done = checks.filter(x => x.checked).length;
-      $('doneCount').textContent = done;
+      const checked = checks.filter(x => x.checked);
+      const doneNos = new Set(checked.map(x => Number(x.dataset.match)));
+      $('doneCount').textContent = checked.length;
 
       // 一括チェック：全試合完了ならON、一部だけなら中間表示
       const all = $('checkAll');
-      all.checked = checks.length > 0 && done === checks.length;
-      all.indeterminate = done > 0 && done < checks.length;
-      checks.forEach(x => $('match-' + x.dataset.match).classList.toggle('done', x.checked));
+      all.checked = checks.length > 0 && checked.length === checks.length;
+      all.indeterminate = checked.length > 0 && checked.length < checks.length;
+      checks.forEach(x => {
+        const card = $('match-' + x.dataset.match);
+        card.classList.toggle('done', x.checked);
+        card.setAttribute('aria-pressed', x.checked);
+      });
 
       // 参加者別の完了試合数：チェック状態から毎回数え直す（外せば自動で減算）
       const tally = Array(session.n + 1).fill(0);
-      checks.filter(x => x.checked).forEach(x => {
-        const m = matchByNo.get(Number(x.dataset.match));
+      doneNos.forEach(no => {
+        const m = matchByNo.get(no);
         [...m.teamA, ...m.teamB].forEach(p => tally[p]++);
       });
       for (let i = 1; i <= session.n; i++) {
@@ -657,8 +684,7 @@
 
       // 最後に作ったラウンドが全て完了か
       const last = session.rounds[session.rounds.length - 1];
-      const lastDone = last.matches.every(m => $('match-' + m.no).querySelector('.match-check').checked);
-      updateNextArea(lastDone);
+      updateNextArea(last.matches.every(m => doneNos.has(m.no)));
     }
 
     /* ---------- 実行 ---------- */
@@ -685,9 +711,10 @@
     function draw(btn) {
       $('error').textContent = '';
       try {
-        const courts = readInt('courts', 1, 30, 'コート数');
-        const n      = readInt('players', 4, 200, '参加人数');
-        const requested = readInt('totalMatches', 1, 1000, '試合数');
+        const courts    = readInt('courts', 'コート数');
+        const n         = readInt('players', '参加人数');
+        const requested = readInt('totalMatches', '試合数');
+        const mode      = document.querySelector('input[name="mode"]:checked').value;
 
         // 全コートを同時に使うには、1コートあたり4人が必要
         if (n < courts * 4) {
@@ -706,8 +733,6 @@
         // 試合数は「コート数の倍数」に切り上げ、最終ラウンドも全コートを使う
         const totalRounds = Math.ceil(requested / courts);
 
-        const mode = document.querySelector('input[name="mode"]:checked').value;
-
         session = { courts, n, totalRounds, rounds: [], mode };
         matchByNo = new Map();
         renderResults(requested);
@@ -724,18 +749,37 @@
 
     $('generate').addEventListener('click', e => draw(e.currentTarget));
 
+    // 試合の枠をタッチ（クリック）すると、完了／取り消しを切り替える
+    // （完了の状態は、見えない .match-check に持たせている）
+    function toggleMatch(card) {
+      const box = card.querySelector('.match-check');
+      box.checked = !box.checked;
+      updateProgress();
+    }
+
     // 結果エリアのイベントは1回だけ登録（再描画しても付け直し不要）
-    $('results').addEventListener('change', e => {
-      const t = e.target;
-      if (t.id === 'checkAll') {
-        // 作成済みの全試合をまとめて ON/OFF
-        document.querySelectorAll('.match-check').forEach(x => { x.checked = t.checked; });
-        updateProgress();
-      } else if (t.classList.contains('match-check')) {
-        updateProgress();
+    const results = $('results');
+
+    results.addEventListener('change', e => {
+      if (e.target.id !== 'checkAll') return;
+      // 作成済みの全試合をまとめて ON/OFF
+      document.querySelectorAll('.match-check').forEach(x => { x.checked = e.target.checked; });
+      updateProgress();
+    });
+
+    results.addEventListener('keydown', e => {
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('match')) {
+        e.preventDefault();
+        toggleMatch(e.target);
       }
     });
-    $('results').addEventListener('click', e => {
+
+    results.addEventListener('click', e => {
+      const card = e.target.closest('.match');
+      if (card) {
+        toggleMatch(card);
+        return;
+      }
       const action = e.target.dataset.action;
       if (action === 'again') draw(e.target);
       if (action === 'print') window.print();
