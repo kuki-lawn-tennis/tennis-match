@@ -221,7 +221,6 @@
       </div>
       <p class="hint">
         試合数はコート数の倍数に切り上げ、全ラウンドで全コートを使います。ラウンドは1つずつ作成します。次のラウンドは、完了にした試合の実績（直前のラウンドは出場済み扱い）をもとに、出場回数が少ない人を優先して選びます（同数の中ではランダム）。
-        出場回数の少ない人から順に、先頭の試合・左のチームへ並べます。同じ回数の人同士の中では、同じペア・対戦相手がなるべく重ならないよう調整します。
       </p>
       <button class="primary" id="generate" type="button">組み合わせを作成</button>
       <p id="error" class="hint error" role="alert"></p>
@@ -506,7 +505,7 @@
       if (armed && armed.btn === btn) { disarm(); return true; } // 2回目の押下で実行
       disarm();
       armed = { btn, label: btn.textContent };
-      btn.textContent = '消えます。もう一度押す';
+      btn.textContent = 'もう一度押すと再組合';
       armTimer = setTimeout(disarm, 4000);
       return false;
     }
