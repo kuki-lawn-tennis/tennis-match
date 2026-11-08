@@ -75,7 +75,7 @@
       font-size: 17px;
     }
 
-    .error { color: var(--error); min-height: 1.6em; margin: 8px 0 0; }
+    .error { color: var(--error); font-size: 14px; font-weight: 700; min-height: 1.6em; margin: 8px 0 0; }
 
     /* ---------- ボタン ---------- */
     button {
@@ -108,6 +108,22 @@
       margin-top: 18px;
       font-size: 20px;
     }
+
+    .all-check-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 16px;
+      font-weight: 650;
+      cursor: pointer;
+      margin: 4px 0 12px;
+    }
+    .all-check-label input { width: 23px; height: 23px; accent-color: var(--green); }
+
+    .next-area { margin-top: 18px; }
+    .next-area .primary { margin-top: 0; }
+    .next-area .primary:disabled { background: #b9c8bf; cursor: not-allowed; }
+    .next-area .hint { margin: 6px 0 0; text-align: center; }
 
     .match {
       border: 1px solid var(--border);
@@ -177,7 +193,7 @@
       header { background: #fff; color: #000; }
       header .hint { color: #000; }
       main { margin: 0; }
-      .panel:first-child, .toolbar button, .match-bottom { display: none; }
+      .panel:first-child, .toolbar button, .match-bottom, .all-check-label, .next-area { display: none; }
       .panel { border: 0; }
       .match { break-inside: avoid; }
     }
@@ -204,7 +220,7 @@
         </label>
       </div>
       <p class="hint">
-        試合数はコート数の倍数に切り上げ、全ラウンドで全コートを使います。出場回数が少ない人を優先し、同数の中ではランダムに選びます。
+        試合数はコート数の倍数に切り上げ、全ラウンドで全コートを使います。ラウンドは1つずつ作成します。次のラウンドは、完了にした試合の実績（直前のラウンドは出場済み扱い）をもとに、出場回数が少ない人を優先して選びます（同数の中ではランダム）。
         ペア・対戦相手もランダムですが、同じ組み合わせがなるべく重ならないよう調整します。
       </p>
       <button class="primary" id="generate" type="button">組み合わせを作成</button>
@@ -221,8 +237,8 @@
     'use strict';
 
     const $ = id => document.getElementById(id);
-    let playerCount = 0;
-    let matchByNo = new Map();
+    let session = null;        // { courts, n, totalRounds, rounds: [] }
+    let matchByNo = new Map(); // 試合番号 → 試合
 
     /* ---------- ユーティリティ ---------- */
     function shuffle(array) {
@@ -243,15 +259,36 @@
     }
 
     /* ---------- 抽選ロジック ---------- */
-    function buildSchedule(courts, n, total) {
-      const ids = Array.from({ length: n }, (_, i) => i + 1);
-      const played = Array(n + 1).fill(0); // 出場回数（選出の優先度用）
+
+    // 実績の集計：完了にチェックが入っている試合に加え、
+    // 直前のラウンドは進行中として全試合を出場済みに数える
+    // （未完了でも次を作ったときに、同じ人が続けて選ばれないようにするため）
+    function collectStats(n) {
+      const played = Array(n + 1).fill(0);                 // 出場回数
       const partner = new Uint16Array((n + 1) * (n + 1));  // ペアになった回数
       const opponent = new Uint16Array((n + 1) * (n + 1)); // 対戦した回数
       const at = (a, b) => (a < b ? a * (n + 1) + b : b * (n + 1) + a);
-      const perRound = Math.min(courts, Math.floor(n / 4));
-      const rounds = [];
-      let matchNo = 0;
+
+      const lastRound = session.rounds[session.rounds.length - 1];
+      const counted = new Set(lastRound ? lastRound.matches.map(m => m.no) : []);
+      document.querySelectorAll('.match-check:checked').forEach(x => counted.add(Number(x.dataset.match)));
+
+      counted.forEach(no => {
+        const m = matchByNo.get(no);
+        const [a, b] = m.teamA, [c, d] = m.teamB;
+        [a, b, c, d].forEach(p => played[p]++);
+        partner[at(a, b)]++;
+        partner[at(c, d)]++;
+        opponent[at(a, c)]++; opponent[at(a, d)]++;
+        opponent[at(b, c)]++; opponent[at(b, d)]++;
+      });
+      return { played, partner, opponent, at };
+    }
+
+    // 1ラウンド分を作る（実績 stats をもとに選出と並べ替え）
+    function createRound(stats, courts, n, roundIndex) {
+      const { played, partner, opponent, at } = stats;
+      const ids = Array.from({ length: n }, (_, i) => i + 1);
 
       // 並べ方の悪さ：同じペアは重く、同じ対戦相手は軽くカウント
       function cost(arr) {
@@ -288,32 +325,20 @@
         return best;
       }
 
-      while (matchNo < total) {
-        const matchCount = Math.min(perRound, total - matchNo);
+      // 出場回数が少ない順に必要人数を選ぶ。同数の中はランダム
+      // （事前にシャッフルしてから安定ソートする）
+      const chosen = shuffle(ids)
+        .sort((a, b) => played[a] - played[b])
+        .slice(0, courts * 4);
+      const chosenSet = new Set(chosen);
+      const arranged = arrange(chosen);
 
-        // 出場回数が少ない順に必要人数を選ぶ。同数の中はランダム
-        // （事前にシャッフルしてから安定ソートする）
-        const chosen = shuffle(ids)
-          .sort((a, b) => played[a] - played[b])
-          .slice(0, matchCount * 4);
-        const chosenSet = new Set(chosen);
-        const arranged = arrange(chosen);
-
-        const matches = [];
-        for (let c = 0; c < matchCount; c++) {
-          const [a, b, x, y] = arranged.slice(c * 4, c * 4 + 4);
-          [a, b, x, y].forEach(p => played[p]++);
-          partner[at(a, b)]++;
-          partner[at(x, y)]++;
-          opponent[at(a, x)]++; opponent[at(a, y)]++;
-          opponent[at(b, x)]++; opponent[at(b, y)]++;
-          matches.push({ no: ++matchNo, court: c + 1, teamA: [a, b], teamB: [x, y] });
-        }
-
-        rounds.push({ matches, waiting: ids.filter(x => !chosenSet.has(x)) });
+      const matches = [];
+      for (let c = 0; c < courts; c++) {
+        const [a, b, x, y] = arranged.slice(c * 4, c * 4 + 4);
+        matches.push({ no: roundIndex * courts + c + 1, court: c + 1, teamA: [a, b], teamB: [x, y] });
       }
-
-      return { rounds };
+      return { matches, waiting: ids.filter(x => !chosenSet.has(x)) };
     }
 
     /* ---------- 描画 ---------- */
@@ -342,7 +367,7 @@
         ? round.waiting.map(x => x + '番').join('、')
         : 'なし';
       return `
-        <div class="round">
+        <div class="round" id="round-${index + 1}">
           <b>🎾第${index + 1}ラウンド</b>
           ${round.matches.map(renderMatch).join('')}
           <div class="waiting">待機：${waiting}</div>
@@ -365,50 +390,114 @@
         </div>`;
     }
 
-    function renderResults(courts, n, total, requested, schedule) {
+    function renderResults(requested) {
+      const { courts, n, totalRounds } = session;
+      const total = totalRounds * courts;
       $('results').innerHTML = `
         <div class="toolbar">
-          <b>抽選結果：${total / courts}ラウンド・合計${total}試合</b>
+          <b>抽選結果：${totalRounds}ラウンド・合計${total}試合</b>
           <span>
             <button class="secondary" data-action="again" type="button">再抽選</button>
             <button class="secondary" data-action="print" type="button">印刷</button>
           </span>
         </div>
         ${requested !== total
-          ? `<p class="hint">入力された${requested}試合を、全コートを使い切る${total}試合（${total / courts}ラウンド）に調整しました。</p>`
+          ? `<p class="hint">入力された${requested}試合を、全コートを使い切る${total}試合（${totalRounds}ラウンド）に調整しました。</p>`
           : ''}
         <div class="stats">
           <div class="stat"><small>コート数</small><b>${courts}</b></div>
           <div class="stat"><small>参加人数</small><b>${n}</b></div>
           <div class="stat"><small>合計試合数</small><b>${total}</b></div>
+          <div class="stat"><small>作成済みラウンド</small><b id="createdRounds">0</b></div>
           <div class="stat"><small>完了試合数</small><b id="doneCount">0</b></div>
         </div>
-        ${schedule.rounds.map(renderRound).join('')}
+        <label class="all-check-label">
+          <input type="checkbox" id="checkAll"> 作成済みの全ラウンドを一括で完了にする
+        </label>
+        <div id="rounds"></div>
+        <div class="next-area" id="nextArea"></div>
         ${renderCountTable(n)}`;
+    }
 
-      playerCount = n;
-      matchByNo = new Map(schedule.rounds.flatMap(r => r.matches).map(m => [m.no, m]));
+    // ラウンドを1つ作って末尾に追加する
+    function addRound() {
+      const { courts, n } = session;
+      const index = session.rounds.length;
+      const round = createRound(collectStats(n), courts, n, index);
+
+      session.rounds.push(round);
+      round.matches.forEach(m => matchByNo.set(m.no, m));
+      $('rounds').insertAdjacentHTML('beforeend', renderRound(round, index));
+      $('createdRounds').textContent = session.rounds.length;
+      updateProgress();
+      return index + 1;
+    }
+
+    // 「次のラウンドを作成」ボタン：直前のラウンドが未完了でも押せる
+    function updateNextArea(lastDone) {
+      const created = session.rounds.length;
+      if (created >= session.totalRounds) {
+        $('nextArea').innerHTML = '<p class="hint">全ラウンドを作成しました。</p>';
+        return;
+      }
+      $('nextArea').innerHTML = `
+        <button class="primary" data-action="next" type="button">
+          第${created + 1}ラウンドを作成
+        </button>
+        <p class="hint">${lastDone
+          ? '完了試合数の実績をもとに、出場回数が均等になるよう組みます。'
+          : '第' + created + 'ラウンドに未完了の試合があります。作成すると、第' + created + 'ラウンドは出場済みとして扱います。'}</p>`;
     }
 
     function updateProgress() {
       const checks = [...document.querySelectorAll('.match-check')];
       const done = checks.filter(x => x.checked).length;
       $('doneCount').textContent = done;
+
+      // 一括チェック：全試合完了ならON、一部だけなら中間表示
+      const all = $('checkAll');
+      all.checked = checks.length > 0 && done === checks.length;
+      all.indeterminate = done > 0 && done < checks.length;
       checks.forEach(x => $('match-' + x.dataset.match).classList.toggle('done', x.checked));
 
       // 参加者別の完了試合数：チェック状態から毎回数え直す（外せば自動で減算）
-      const tally = Array(playerCount + 1).fill(0);
+      const tally = Array(session.n + 1).fill(0);
       checks.filter(x => x.checked).forEach(x => {
         const m = matchByNo.get(Number(x.dataset.match));
         [...m.teamA, ...m.teamB].forEach(p => tally[p]++);
       });
-      for (let i = 1; i <= playerCount; i++) {
+      for (let i = 1; i <= session.n; i++) {
         $('done-count-' + i).textContent = tally[i] + '回';
       }
+
+      // 最後に作ったラウンドが全て完了か
+      const last = session.rounds[session.rounds.length - 1];
+      const lastDone = last.matches.every(m => $('match-' + m.no).querySelector('.match-check').checked);
+      updateNextArea(lastDone);
     }
 
     /* ---------- 実行 ---------- */
-    function draw() {
+    // 作り直しの確認：confirm() は埋め込み表示などで無効になり、
+    // ボタンが効かないように見えるため、ボタンの2回押しで確認する
+    let armed = null, armTimer = null;
+
+    function disarm() {
+      if (!armed) return;
+      armed.btn.textContent = armed.label;
+      armed = null;
+      clearTimeout(armTimer);
+    }
+
+    function confirmByButton(btn) {
+      if (armed && armed.btn === btn) { disarm(); return true; } // 2回目の押下で実行
+      disarm();
+      armed = { btn, label: btn.textContent };
+      btn.textContent = 'もう一度押すと再組合せ';
+      armTimer = setTimeout(disarm, 4000);
+      return false;
+    }
+
+    function draw(btn) {
       $('error').textContent = '';
       try {
         const courts = readInt('courts', 1, 30, 'コート数');
@@ -421,32 +510,46 @@
             + 'コート数を減らすか、参加人数を増やしてください。');
         }
 
-        // 完了チェックが1つでもあれば、消える前に確認する
-        if (document.querySelector('.match-check:checked') &&
-            !confirm('試合完了のチェックがすべて消えます。作り直しますか？')) {
+        // 作成済みの組み合わせやチェックが消える前に確認する
+        if (session && (document.querySelector('.match-check:checked') || session.rounds.length > 1) &&
+            !confirmByButton(btn)) {
           return;
         }
 
         // 試合数は「コート数の倍数」に切り上げ、最終ラウンドも全コートを使う
-        const total = Math.ceil(requested / courts) * courts;
+        const totalRounds = Math.ceil(requested / courts);
 
-        renderResults(courts, n, total, requested, buildSchedule(courts, n, total));
+        session = { courts, n, totalRounds, rounds: [] };
+        matchByNo = new Map();
+        renderResults(requested);
+        addRound(); // 最初は第1ラウンドだけ作る
         $('results').scrollIntoView({ behavior: 'smooth' });
       } catch (e) {
         $('error').textContent = e.message;
       }
     }
 
-    $('generate').addEventListener('click', draw);
+    $('generate').addEventListener('click', e => draw(e.currentTarget));
 
     // 結果エリアのイベントは1回だけ登録（再描画しても付け直し不要）
     $('results').addEventListener('change', e => {
-      if (e.target.classList.contains('match-check')) updateProgress();
+      const t = e.target;
+      if (t.id === 'checkAll') {
+        // 作成済みの全試合をまとめて ON/OFF
+        document.querySelectorAll('.match-check').forEach(x => { x.checked = t.checked; });
+        updateProgress();
+      } else if (t.classList.contains('match-check')) {
+        updateProgress();
+      }
     });
     $('results').addEventListener('click', e => {
       const action = e.target.dataset.action;
-      if (action === 'again') draw();
+      if (action === 'again') draw(e.target);
       if (action === 'print') window.print();
+      if (action === 'next') {
+        const no = addRound();
+        $('round-' + no).scrollIntoView({ behavior: 'smooth' });
+      }
     });
   })();
   </script>
