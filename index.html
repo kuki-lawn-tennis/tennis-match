@@ -84,6 +84,28 @@
       font-size: 18px;
     }
 
+    .mode {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px 20px;
+      margin-top: 14px;
+      font-size: 18px;
+    }
+    .mode-title { font-weight: 650; }
+    .mode-option {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .mode-option input {
+      width: 20px;
+      height: 20px;
+      margin: 0;
+      accent-color: var(--green);
+    }
+
     .error { 
       color: var(--error); 
       font-size: 14px; 
@@ -309,8 +331,15 @@
           <input id="totalMatches" type="number" min="1" max="1000" value="10" inputmode="numeric">
         </label>
       </div>
+      <div class="mode" role="radiogroup" aria-label="作成モード">
+        <span class="mode-title">作成モード</span>
+        <label class="mode-option"><input type="radio" name="mode" value="seq" checked> 順次作成</label>
+        <label class="mode-option"><input type="radio" name="mode" value="bulk"> 一括作成</label>
+      </div>
       <p class="hint">
-        試合数はコート数の倍数に切り上げ、全ラウンドで全コートを使います。ラウンドは1つずつ作成します。
+        試合数はコート数の倍数に切り上げ、全ラウンドで全コートを使います。
+        一括作成は、全ラウンドを最初にまとめて作成します。
+        順次作成は、ラウンドを1つずつ作成します。
       </p>
       <button class="primary" id="generate" type="button">組み合わせを作成</button>
       <p id="error" class="hint error" role="alert"></p>
@@ -326,7 +355,7 @@
     'use strict';
 
     const $ = id => document.getElementById(id);
-    let session = null;        // { courts, n, totalRounds, rounds: [] }
+    let session = null;        // { courts, n, totalRounds, rounds: [], mode: 'bulk' | 'seq' }
     let matchByNo = new Map(); // 試合番号 → 試合
 
     /* ---------- ユーティリティ ---------- */
@@ -349,27 +378,36 @@
 
     /* ---------- 抽選ロジック ---------- */
 
-    // 実績の集計：完了にチェックが入っている試合に加え、
-    // 直前のラウンドは進行中として全試合を出場済みに数える
-    // （未完了でも次を作ったときに、同じ人が続けて選ばれないようにするため）
-    function collectStats(n) {
-      const played = Array(n + 1).fill(0);                 // 出場回数
-      const partner = new Uint16Array((n + 1) * (n + 1));  // ペアになった回数
-      const at = (a, b) => (a < b ? a * (n + 1) + b : b * (n + 1) + a);
+    function newStats(n) {
+      return {
+        played: Array(n + 1).fill(0),                 // 出場回数
+        partner: new Uint16Array((n + 1) * (n + 1)),  // ペアになった回数
+        at: (a, b) => (a < b ? a * (n + 1) + b : b * (n + 1) + a)
+      };
+    }
 
-      const lastRound = session.rounds[session.rounds.length - 1];
-      const counted = new Set(lastRound ? lastRound.matches.map(m => m.no) : []);
-      document.querySelectorAll('.match-check:checked').forEach(x => counted.add(Number(x.dataset.match)));
-
-      counted.forEach(no => {
-        const m = matchByNo.get(no);
+    // 試合のリストを実績に加える
+    function countMatches(stats, matches) {
+      const { played, partner, at } = stats;
+      matches.forEach(m => {
         const [a, b] = m.teamA, [c, d] = m.teamB;
         [a, b, c, d].forEach(p => played[p]++);
         partner[at(a, b)]++;
         partner[at(c, d)]++;
       });
+    }
 
-      return { played, partner, at };
+    // 順次作成の実績：完了にチェックが入っている試合に加え、
+    // 直前のラウンドは進行中として全試合を出場済みに数える
+    // （未完了でも次を作ったときに、同じ人が続けて選ばれないようにするため）
+    function collectStats(n) {
+      const lastRound = session.rounds[session.rounds.length - 1];
+      const counted = new Set(lastRound ? lastRound.matches.map(m => m.no) : []);
+      document.querySelectorAll('.match-check:checked').forEach(x => counted.add(Number(x.dataset.match)));
+
+      const stats = newStats(n);
+      countMatches(stats, [...counted].map(no => matchByNo.get(no)));
+      return stats;
     }
 
     // 1ラウンド分を作る（実績 stats をもとに選出と並べ替え）
@@ -454,6 +492,29 @@
         matches.push({ no: roundIndex * courts + c + 1, court: c + 1, teamA: [a, b], teamB: [x, y] });
       }
       return { matches, waiting: ids.filter(x => !chosenSet.has(x)) };
+    }
+
+    // 一括作成：全ラウンドを、作成済みのラウンドをすべて実績として数えながら順に作る。
+    // 何通りか作り直して、同じペアの重複が最も少ない組み合わせを採用する
+    // （入力が大きいときは時間で打ち切り、最低1通りは必ず作る）
+    function buildAll(courts, n, totalRounds) {
+      const pairRepeats = partner => partner.reduce((t, v) => t + (v > 1 ? v - 1 : 0), 0);
+      const started = performance.now();
+      let best = null, bestScore = Infinity;
+
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const stats = newStats(n);
+        const rounds = [];
+        for (let r = 0; r < totalRounds; r++) {
+          const round = createRound(stats, courts, n, r);
+          rounds.push(round);
+          countMatches(stats, round.matches);
+        }
+        const score = pairRepeats(stats.partner);
+        if (score < bestScore) { best = rounds; bestScore = score; }
+        if (bestScore === 0 || performance.now() - started > 400) break;
+      }
+      return best;
     }
 
     /* ---------- 描画 ---------- */
@@ -548,6 +609,15 @@
       return index + 1;
     }
 
+    // 一括作成：作成済みの全ラウンドをまとめて表示する
+    function showAllRounds(rounds) {
+      session.rounds = rounds;
+      rounds.forEach(r => r.matches.forEach(m => matchByNo.set(m.no, m)));
+      $('rounds').innerHTML = rounds.map(renderRound).join('');
+      $('createdRounds').textContent = rounds.length;
+      updateProgress();
+    }
+
     // 「次のラウンドを作成」ボタン：直前のラウンドが未完了でも押せる
     function updateNextArea(lastDone) {
       const created = session.rounds.length;
@@ -626,7 +696,9 @@
         }
 
         // 作成済みの組み合わせやチェックが消える前に確認する
-        if (session && (document.querySelector('.match-check:checked') || session.rounds.length > 1) &&
+        // （一括作成はチェックがなければ、そのまま作り直す）
+        if (session && (document.querySelector('.match-check:checked') ||
+                        (session.mode === 'seq' && session.rounds.length > 1)) &&
             !confirmByButton(btn)) {
           return;
         }
@@ -634,10 +706,16 @@
         // 試合数は「コート数の倍数」に切り上げ、最終ラウンドも全コートを使う
         const totalRounds = Math.ceil(requested / courts);
 
-        session = { courts, n, totalRounds, rounds: [] };
+        const mode = document.querySelector('input[name="mode"]:checked').value;
+
+        session = { courts, n, totalRounds, rounds: [], mode };
         matchByNo = new Map();
         renderResults(requested);
-        addRound(); // 最初は第1ラウンドだけ作る
+        if (mode === 'bulk') {
+          showAllRounds(buildAll(courts, n, totalRounds)); // 全ラウンドを一度に作る
+        } else {
+          addRound(); // 最初は第1ラウンドだけ作る
+        }
         $('results').scrollIntoView({ behavior: 'smooth' });
       } catch (e) {
         $('error').textContent = e.message;
