@@ -221,7 +221,6 @@
       </div>
       <p class="hint">
         試合数はコート数の倍数に切り上げ、全ラウンドで全コートを使います。ラウンドは1つずつ作成します。
-        次のラウンドは、完了にした試合の実績（直前のラウンドは出場済み扱い）をもとに、出場回数が少ない人を優先して選びます（同数の中ではランダム）。
       </p>
       <button class="primary" id="generate" type="button">組み合わせを作成</button>
       <p id="error" class="hint error" role="alert"></p>
@@ -266,7 +265,6 @@
     function collectStats(n) {
       const played = Array(n + 1).fill(0);                 // 出場回数
       const partner = new Uint16Array((n + 1) * (n + 1));  // ペアになった回数
-      const opponent = new Uint16Array((n + 1) * (n + 1)); // 対戦した回数
       const at = (a, b) => (a < b ? a * (n + 1) + b : b * (n + 1) + a);
 
       const lastRound = session.rounds[session.rounds.length - 1];
@@ -279,30 +277,21 @@
         [a, b, c, d].forEach(p => played[p]++);
         partner[at(a, b)]++;
         partner[at(c, d)]++;
-        opponent[at(a, c)]++; opponent[at(a, d)]++;
-        opponent[at(b, c)]++; opponent[at(b, d)]++;
       });
 
-      // 直近で連続して待機した回数（出場回数が同じ人の中での優先順に使う）
-      const rest = Array(n + 1).fill(0);
-      for (let p = 1; p <= n; p++) {
-        for (let i = session.rounds.length - 1; i >= 0 && session.rounds[i].waiting.includes(p); i--) rest[p]++;
-      }
-      return { played, rest, partner, opponent, at };
+      return { played, partner, at };
     }
 
     // 1ラウンド分を作る（実績 stats をもとに選出と並べ替え）
     function createRound(stats, courts, n, roundIndex) {
-      const { played, rest, partner, opponent, at } = stats;
+      const { played, partner, at } = stats;
       const ids = Array.from({ length: n }, (_, i) => i + 1);
 
-      // 並べ方の悪さ：同じペアは重く、同じ対戦相手は軽くカウント
+      // 並べ方の悪さ：同じペアになった回数の合計（対戦相手の重複は見ない）
       function cost(arr) {
         let c = 0;
         for (let i = 0; i < arr.length; i += 4) {
-          const a = arr[i], b = arr[i + 1], x = arr[i + 2], y = arr[i + 3];
-          c += 10 * (partner[at(a, b)] + partner[at(x, y)]);
-          c += opponent[at(a, x)] + opponent[at(a, y)] + opponent[at(b, x)] + opponent[at(b, y)];
+          c += partner[at(arr[i], arr[i + 1])] + partner[at(arr[i + 2], arr[i + 3])];
         }
         return c;
       }
@@ -319,44 +308,59 @@
         return out;
       }
 
-      // 同じ回数の人の中で、ランダム抽選＋山登りにより重複の少ない並べ方を探す
-      function arrange(sorted) {
-        let best = shuffleTies(sorted);
-        let bestCost = cost(best);
+      // 出場回数が少ない順に必要人数を選ぶ。
+      //   ・境目より回数の少ない人は全員出場（sure）
+      //   ・境目と同じ回数の人（pool）は、その中から不足分を選ぶ。
+      //     誰を選ぶかは待機の有無ではなく、同じペアが重ならないことで決める
+      const need = courts * 4;
+      const order = shuffle(ids).sort((a, b) => played[a] - played[b]);
+      const cut = played[order[need - 1]];
+      const sure = order.filter(p => played[p] < cut);
+      const pool = order.filter(p => played[p] === cut);
+      const take = need - sure.length;
 
-        for (let t = 0; t < 200 && bestCost > 0; t++) {
-          const cand = shuffleTies(sorted);
-          const c = cost(cand);
-          if (c < bestCost) { best = cand; bestCost = c; }
-        }
-
-        const len = best.length;
-        for (let t = 0; t < 400 && bestCost > 0; t++) {
-          const i = Math.floor(Math.random() * len);
-          const j = Math.floor(Math.random() * len);
-          if (i === j || played[best[i]] !== played[best[j]]) continue;
-          [best[i], best[j]] = [best[j], best[i]];
-          const c = cost(best);
-          if (c <= bestCost) bestCost = c;
-          else [best[i], best[j]] = [best[j], best[i]];
-        }
-        return best;
+      function build() {
+        const sh = shuffle(pool);
+        return { arr: shuffleTies([...sure, ...sh.slice(0, take)]), spare: sh.slice(take) };
       }
 
-      // 出場回数が少ない順に必要人数を選ぶ。
-      // 同数の中では、直前のラウンドで待機していた人（連続待機が長い人）を優先し、
-      // それも同じならランダム（事前にシャッフルしてから安定ソートする）
-      const chosen = shuffle(ids)
-        .sort((a, b) => played[a] - played[b] || rest[b] - rest[a])
-        .slice(0, courts * 4);
-      const chosenSet = new Set(chosen);
+      // ランダム抽選＋山登りで、同じペアの少ない「選び方・並べ方」を探す
+      let cur = build();
+      let curCost = cost(cur.arr);
+
+      for (let t = 0; t < 200 && curCost > 0; t++) {
+        const cand = build();
+        const c = cost(cand.arr);
+        if (c < curCost) { cur = cand; curCost = c; }
+      }
+
+      const { arr, spare } = cur;
+      for (let t = 0; t < 400 && curCost > 0; t++) {
+        const i = Math.floor(Math.random() * arr.length);
+        if (spare.length && played[arr[i]] === cut && Math.random() < 0.5) {
+          // 出場者と、同じ回数の待機候補を入れ替える
+          const k = Math.floor(Math.random() * spare.length);
+          [arr[i], spare[k]] = [spare[k], arr[i]];
+          const c = cost(arr);
+          if (c <= curCost) curCost = c;
+          else [arr[i], spare[k]] = [spare[k], arr[i]];
+        } else {
+          // 出場者同士で、同じ回数の人を入れ替える
+          const j = Math.floor(Math.random() * arr.length);
+          if (i === j || played[arr[i]] !== played[arr[j]]) continue;
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+          const c = cost(arr);
+          if (c <= curCost) curCost = c;
+          else [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+      }
 
       // 回数が少ない人から順に、先頭の試合・左のチームの先頭へ詰める
       //   1試合目 = [A1・A2 vs B1・B2]、2試合目 = …
-      const arranged = arrange(chosen);
+      const chosenSet = new Set(arr);
       const matches = [];
       for (let c = 0; c < courts; c++) {
-        const [a, b, x, y] = arranged.slice(c * 4, c * 4 + 4);
+        const [a, b, x, y] = arr.slice(c * 4, c * 4 + 4);
         matches.push({ no: roundIndex * courts + c + 1, court: c + 1, teamA: [a, b], teamB: [x, y] });
       }
       return { matches, waiting: ids.filter(x => !chosenSet.has(x)) };
