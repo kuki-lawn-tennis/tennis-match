@@ -221,7 +221,7 @@
       </div>
       <p class="hint">
         試合数はコート数の倍数に切り上げ、全ラウンドで全コートを使います。ラウンドは1つずつ作成します。次のラウンドは、完了にした試合の実績（直前のラウンドは出場済み扱い）をもとに、出場回数が少ない人を優先して選びます（同数の中ではランダム）。
-        ペア・対戦相手もランダムですが、同じ組み合わせがなるべく重ならないよう調整します。
+        出場回数の少ない人から順に、先頭の試合・左のチームへ並べます。同じ回数の人同士の中では、同じペア・対戦相手がなるべく重ならないよう調整します。
       </p>
       <button class="primary" id="generate" type="button">組み合わせを作成</button>
       <p id="error" class="hint error" role="alert"></p>
@@ -301,13 +301,25 @@
         return c;
       }
 
-      // ランダム抽選＋山登りで、重複の少ない並べ方を探す
-      function arrange(players) {
-        let best = shuffle(players);
+      // 出場回数が同じ人同士だけを入れ替えて並べる（回数の順序は崩さない）
+      function shuffleTies(arr) {
+        const out = [];
+        for (let i = 0; i < arr.length; ) {
+          let j = i;
+          while (j < arr.length && played[arr[j]] === played[arr[i]]) j++;
+          out.push(...shuffle(arr.slice(i, j)));
+          i = j;
+        }
+        return out;
+      }
+
+      // 同じ回数の人の中で、ランダム抽選＋山登りにより重複の少ない並べ方を探す
+      function arrange(sorted) {
+        let best = shuffleTies(sorted);
         let bestCost = cost(best);
 
         for (let t = 0; t < 200 && bestCost > 0; t++) {
-          const cand = shuffle(players);
+          const cand = shuffleTies(sorted);
           const c = cost(cand);
           if (c < bestCost) { best = cand; bestCost = c; }
         }
@@ -316,7 +328,7 @@
         for (let t = 0; t < 400 && bestCost > 0; t++) {
           const i = Math.floor(Math.random() * len);
           const j = Math.floor(Math.random() * len);
-          if (i === j) continue;
+          if (i === j || played[best[i]] !== played[best[j]]) continue;
           [best[i], best[j]] = [best[j], best[i]];
           const c = cost(best);
           if (c <= bestCost) bestCost = c;
@@ -331,8 +343,10 @@
         .sort((a, b) => played[a] - played[b])
         .slice(0, courts * 4);
       const chosenSet = new Set(chosen);
-      const arranged = arrange(chosen);
 
+      // 回数が少ない人から順に、先頭の試合・左のチームの先頭へ詰める
+      //   1試合目 = [A1・A2 vs B1・B2]、2試合目 = …
+      const arranged = arrange(chosen);
       const matches = [];
       for (let c = 0; c < courts; c++) {
         const [a, b, x, y] = arranged.slice(c * 4, c * 4 + 4);
@@ -492,7 +506,7 @@
       if (armed && armed.btn === btn) { disarm(); return true; } // 2回目の押下で実行
       disarm();
       armed = { btn, label: btn.textContent };
-      btn.textContent = 'もう一度押すと再組合せ';
+      btn.textContent = '消えます。もう一度押す';
       armTimer = setTimeout(disarm, 4000);
       return false;
     }
