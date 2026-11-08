@@ -376,7 +376,7 @@
     'use strict';
 
     const $ = id => document.getElementById(id);
-    let session = null;        // { courts, n, totalRounds, rounds: [], mode: 'bulk' | 'seq' }
+    let session = null;        // { courts, n, totalRounds, rounds: [], mode: 'bulk' | 'seq', requested }
     let matchByNo = new Map(); // 試合番号 → 試合
 
     /* ---------- ユーティリティ ---------- */
@@ -518,17 +518,20 @@
     }
 
     // 一括作成：全ラウンドを、作成済みのラウンドをすべて実績として数えながら順に作る。
+    // existing（作成済みのラウンド）があるときは、その続きのラウンドだけを作って返す。
     // 何通りか作り直して、同じペアの重複が最も少ない組み合わせを採用する
     // （入力が大きいときは時間で打ち切り、最低1通りは必ず作る）
-    function buildAll(courts, n, totalRounds) {
+    function buildAll(courts, n, totalRounds, existing = []) {
       const pairRepeats = partner => partner.reduce((t, v) => t + (v > 1 ? v - 1 : 0), 0);
+      const base = existing.flatMap(r => r.matches);
       const started = performance.now();
       let best = null, bestScore = Infinity;
 
       for (let attempt = 0; attempt < 20; attempt++) {
         const stats = newStats(n);
+        countMatches(stats, base);
         const rounds = [];
-        for (let r = 0; r < totalRounds; r++) {
+        for (let r = existing.length; r < totalRounds; r++) {
           const round = createRound(stats, courts, n, r);
           rounds.push(round);
           countMatches(stats, round.matches);
@@ -687,6 +690,27 @@
       updateNextArea(last.matches.every(m => doneNos.has(m.no)));
     }
 
+    // すべての試合が完了したあとに試合数が増えたとき、作成済みの内容を残して続きのラウンドを作る
+    //   順次作成：次のラウンドを1つ作る　／　一括作成：増えた分のラウンドをまとめて作る
+    function continueRounds(requested) {
+      const { courts, n, mode } = session;
+      const old = session.rounds;
+      const doneMax = old.length * courts; // これまでの試合はすべて完了済み
+
+      disarm();
+      session.totalRounds = Math.ceil(requested / courts);
+      session.requested = requested;
+      const all = mode === 'bulk' ? old.concat(buildAll(courts, n, session.totalRounds, old)) : old;
+
+      renderResults(requested);
+      showAllRounds(all);
+      document.querySelectorAll('.match-check').forEach(x => { x.checked = Number(x.dataset.match) <= doneMax; });
+      updateProgress();
+
+      const first = mode === 'bulk' ? old.length + 1 : addRound();
+      $('round-' + first).scrollIntoView({ behavior: 'smooth' });
+    }
+
     /* ---------- 実行 ---------- */
     // 作り直しの確認：confirm() は埋め込み表示などで無効になり、
     // ボタンが効かないように見えるため、ボタンの2回押しで確認する
@@ -722,6 +746,19 @@
             + 'コート数を減らすか、参加人数を増やしてください。');
         }
 
+        // すべての試合が完了していて、同じ設定のまま試合数だけを変えたとき
+        //   ・作成済みより増えた → 続きのラウンドを作る
+        //   ・減らした（または切り上げ分の範囲内）→ 何もしない
+        //   ・作成時と同じ試合数 → 通常の作り直し
+        const allDone = session && [...document.querySelectorAll('.match-check')].every(x => x.checked);
+        if (allDone && session.courts === courts && session.n === n && session.mode === mode) {
+          if (requested > session.totalRounds * courts) {
+            continueRounds(requested);
+            return;
+          }
+          if (requested !== session.requested) return;
+        }
+
         // 作成済みの組み合わせやチェックが消える前に確認する
         // （一括作成はチェックがなければ、そのまま作り直す）
         if (session && (document.querySelector('.match-check:checked') ||
@@ -733,7 +770,7 @@
         // 試合数は「コート数の倍数」に切り上げ、最終ラウンドも全コートを使う
         const totalRounds = Math.ceil(requested / courts);
 
-        session = { courts, n, totalRounds, rounds: [], mode };
+        session = { courts, n, totalRounds, rounds: [], mode, requested };
         matchByNo = new Map();
         renderResults(requested);
         if (mode === 'bulk') {
