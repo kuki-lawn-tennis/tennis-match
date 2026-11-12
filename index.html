@@ -5,15 +5,66 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>テニス ダブルス組み合わせ抽選</title>
   <style>
+    /* ライト（既定）。色はここにまとめ、ダークは下の media query で差し替える */
     :root {
-      --green: #176b45;
-      --green-dark: #145638;
+      color-scheme: light dark;
+
       --bg: #f4f7f5;
+      --surface: #fff;
       --text: #203027;
       --muted: #64736a;
       --border: #d9e2dc;
+      --divider: #e1e9e3;
       --soft: #f0f5f1;
       --error: #b42318;
+
+      --green: #176b45;          /* 背景に使う緑（ヘッダー・主ボタン） */
+      --on-green: #fff;          /* 緑の上の文字 */
+      --green-text: #176b45;     /* 面の上に置く緑（文字・チェック・枠） */
+      --btn-soft: #e8f0eb;
+      --btn-soft-text: #145638;
+
+      --input-bg: #fff;
+      --input-text: #000;
+      --input-border: #b9c8bf;
+
+      --match-head: #526258;
+      --team-bg: #f1f6f2;
+      --vs: #78857d;
+      --waiting: #5d6c62;
+      --done-bg: #f0f7f2;
+      --done-border: #9bc5a8;
+    }
+
+    /* ダーク（画面表示のみ。印刷は常にライト） */
+    @media screen and (prefers-color-scheme: dark) {
+      :root {
+        --bg: #101612;
+        --surface: #18211b;
+        --text: #e6efe9;
+        --muted: #9db0a4;
+        --border: #2c3a32;
+        --divider: #2c3a32;
+        --soft: #202c25;
+        --error: #ff8a80;
+
+        --green: #1f7a50;
+        --on-green: #fff;
+        --green-text: #5fd39b;
+        --btn-soft: #26352c;
+        --btn-soft-text: #bfe8d2;
+
+        --input-bg: #101612;
+        --input-text: #e6efe9;
+        --input-border: #415449;
+
+        --match-head: #a8bbb0;
+        --team-bg: #202c25;
+        --vs: #8a9e92;
+        --waiting: #a8bbb0;
+        --done-bg: #1c3326;
+        --done-border: #2f6b49;
+      }
     }
 
     * {
@@ -31,7 +82,7 @@
     /* ---------- レイアウト ---------- */
     header {
       background: var(--green);
-      color: #fff;
+      color: var(--on-green);
       padding: 20px 16px;
     }
     header h1 {
@@ -39,7 +90,7 @@
       font-size: 21px;
     }
     header .hint {
-      color: #fff;
+      color: var(--on-green);
       margin: 4px 0 0;
     }
 
@@ -50,7 +101,7 @@
     }
 
     .panel {
-      background: #fff;
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 13px;
       padding: 15px;
@@ -80,8 +131,10 @@
       width: 100%;
       margin-top: 6px;
       padding: 12px;
-      border: 1px solid #b9c8bf;
+      border: 1px solid var(--input-border);
       border-radius: 8px;
+      background: var(--input-bg);
+      color: var(--input-text);
       font-size: 18px;
     }
 
@@ -106,7 +159,7 @@
       width: 20px;
       height: 20px;
       margin: 0;
-      accent-color: var(--green);
+      accent-color: var(--green-text);
     }
 
     .error {
@@ -128,13 +181,13 @@
     }
     .primary {
       background: var(--green);
-      color: #fff;
+      color: var(--on-green);
       width: 100%;
       margin-top: 14px;
     }
     .secondary {
-      background: #e8f0eb;
-      color: var(--green-dark);
+      background: var(--btn-soft);
+      color: var(--btn-soft-text);
     }
 
     /* ---------- 結果ヘッダー ---------- */
@@ -184,7 +237,7 @@
     .all-check-label input {
       width: 23px;
       height: 23px;
-      accent-color: var(--green);
+      accent-color: var(--green-text);
     }
 
     .next-area {
@@ -209,19 +262,19 @@
       -webkit-tap-highlight-color: transparent;
     }
     .match:focus-visible {
-      outline: 3px solid var(--green);
+      outline: 3px solid var(--green-text);
       outline-offset: 2px;
     }
     .match.done {
-      background: #f0f7f2;
-      border-color: #9bc5a8;
+      background: var(--done-bg);
+      border-color: var(--done-border);
     }
 
     .match-head {
       display: flex;
       justify-content: space-between;
       font-size: 18px;
-      color: #526258;
+      color: var(--match-head);
       margin-bottom: 9px;
     }
 
@@ -232,7 +285,7 @@
       align-items: center;
     }
     .team {
-      background: #f1f6f2;
+      background: var(--team-bg);
       padding: 12px 5px;
       text-align: center;
       border-radius: 8px;
@@ -241,7 +294,7 @@
     }
     .vs {
       font-size: 12px;
-      color: #78857d;
+      color: var(--vs);
     }
 
     .match-bottom {
@@ -251,7 +304,7 @@
       gap: 8px;
       margin-top: 11px;
       padding-top: 9px;
-      border-top: 1px solid #e1e9e3;
+      border-top: 1px solid var(--divider);
     }
     .tap-hint {
       font-size: 14px;
@@ -265,7 +318,7 @@
       display: none;
       font-size: 14px;
       font-weight: 700;
-      color: var(--green);
+      color: var(--green-text);
     }
     .match.done .done-badge {
       display: inline;
@@ -273,7 +326,7 @@
 
     .waiting {
       font-size: 16px;
-      color: #5d6c62;
+      color: var(--waiting);
       line-height: 1.6;
       margin-top: 8px;
     }
@@ -291,7 +344,7 @@
     }
     td.done-cell {
       font-weight: 700;
-      color: var(--green);
+      color: var(--green-text);
     }
     .count-title {
       display: block;
@@ -306,6 +359,9 @@
     }
 
     @media print {
+      :root {
+        color-scheme: light;
+      }
       header {
         background: #fff;
         color: #000;
