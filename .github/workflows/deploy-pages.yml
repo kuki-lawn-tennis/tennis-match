@@ -1,0 +1,52 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Pages へのデプロイに必要な最小限の権限
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同時に複数のデプロイを走らせない（最新の1件だけ実行）
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check required files
+        run: |
+          for f in index.html style.css; do
+            test -f "$f" || { echo "::error::$f がありません"; exit 1; }
+          done
+          grep -q 'href="style.css"' index.html || { echo "::error::index.html が style.css を読み込んでいません"; exit 1; }
+
+      # 公開に必要なファイルだけを _site に集める（.github などは公開しない）
+      - name: Build site
+        run: |
+          mkdir _site
+          cp index.html style.css _site/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
