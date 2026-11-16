@@ -2,7 +2,12 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+    paths:
+      - index.html
+      - style.css
+      - .github/workflows/deploy-pages.yml
   workflow_dispatch:
 
 # Pages へのデプロイに必要な最小限の権限
