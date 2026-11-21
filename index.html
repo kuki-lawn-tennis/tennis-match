@@ -237,43 +237,22 @@
         </div>`;
     }
 
-    // 別タブ用：操作部分（タッチで完了など）を除いた、番号だけの表示
-    function renderPlainRound(round, index) {
-      const waiting = round.waiting.length
-        ? round.waiting.map(x => x + '番').join('、')
-        : 'なし';
-      const matches = round.matches.map(m => `
-          <div class="match">
-            <div class="match-head"><span>第${m.no}試合</span><b>コート${m.court}</b></div>
-            <div class="teams">
-              <div class="team">${pairText(m.teamA)}</div>
-              <div class="vs">VS</div>
-              <div class="team">${pairText(m.teamB)}</div>
-            </div>
-          </div>`).join('');
-      return `
-        <div class="round">
-          <b>🎾第${index + 1}ラウンド</b>
-          ${matches}
-          <div class="waiting">待機：${waiting}</div>
-        </div>`;
-    }
-
     /* ---------- 別タブ表示 ----------
-       抽選結果を URL の # 以降に入れて、同じページを「結果だけの表示」で開く。
+       抽選結果と完了状況を URL の # 以降に入れて、同じページを「結果の表示」で開く。
        更新しても同じ内容が出て、スタイルも同じ style.css をそのまま使える。
-       形式：#view=コート数/人数/ラウンド（~区切り）。ラウンドは試合（,区切り）、
-             試合は「A1-A2.B1-B2」 */
-    function encodeView() {
+       形式：#view=コート数/人数/ラウンド（~区切り）&done=完了した試合番号（,区切り）
+             ラウンドは試合（,区切り）、試合は「A1-A2.B1-B2」 */
+    function encodeView(done = []) {
       const rounds = session.rounds
         .map(r => r.matches.map(m => m.teamA.join('-') + '.' + m.teamB.join('-')).join(','))
         .join('~');
-      return '#view=' + session.courts + '/' + session.n + '/' + rounds;
+      return '#view=' + session.courts + '/' + session.n + '/' + rounds +
+        (done.length ? '&done=' + done.join(',') : '');
     }
 
     // 不正な値なら null を返す（通常の画面を表示する）
     function decodeView(hash) {
-      const m = /^#view=(\d+)\/(\d+)\/([\d.,~-]+)$/.exec(hash);
+      const m = /^#view=(\d+)\/(\d+)\/([\d.,~-]+)(?:&done=([\d,]*))?$/.exec(hash);
       if (!m) return null;
       const courts = Number(m[1]), n = Number(m[2]);
       if (courts < 1 || n < courts * 4) return null;
@@ -294,22 +273,43 @@
         const used = new Set(ids);
         rounds.push({ matches, waiting: Array.from({ length: n }, (_, i) => i + 1).filter(x => !used.has(x)) });
       }
-      return { courts, n, rounds };
+
+      const done = m[4] ? m[4].split(',').map(Number) : [];
+      if (done.some(no => !Number.isInteger(no) || no < 1 || no > rounds.length * courts)) return null;
+      return { courts, n, rounds, done };
     }
 
-    // 結果だけの表示に切り替える（入力欄や操作ボタンは出さない）
+    // 別タブの表示：完了のチェックと参加者別の試合数も、元の画面と同じように使える
     function showView(view) {
-      const title = '抽選結果（コート' + view.courts + '・' + view.n + '人）';
+      const { courts, n, rounds, done } = view;
+      const title = '抽選結果（コート' + courts + '・' + n + '人）';
+
+      session = { courts, n, totalRounds: rounds.length, rounds, mode: 'view', requested: rounds.length * courts };
+      matchByNo = new Map(rounds.flatMap(r => r.matches).map(m => [m.no, m]));
+
       document.title = title;
       document.querySelector('header h1').textContent = title;
       document.querySelector('header .hint').hidden = true;
       document.querySelector('main > .panel').hidden = true; // 入力フォーム
-      $('results').innerHTML = view.rounds.map(renderPlainRound).join('');
-      $('results').querySelectorAll('.match').forEach(el => { el.style.cursor = 'default'; });
+      $('results').innerHTML = `
+        <div class="stats">
+          <div class="stat"><small>合計試合数</small><b>${rounds.length * courts}</b></div>
+          <div class="stat"><small>完了試合数</small><b id="doneCount">0</b></div>
+        </div>
+        <label class="all-check-label">
+          <input type="checkbox" id="checkAll"> 全試合を一括で完了にする
+        </label>
+        <div id="rounds">${rounds.map(renderRound).join('')}</div>
+        ${renderCountTable(n)}`;
+
+      const doneSet = new Set(done);
+      document.querySelectorAll('.match-check').forEach(x => { x.checked = doneSet.has(Number(x.dataset.match)); });
+      updateProgress();
     }
 
     function openInNewTab() {
-      if (!window.open(location.href.split('#')[0] + encodeView(), '_blank')) {
+      const done = [...document.querySelectorAll('.match-check:checked')].map(x => Number(x.dataset.match));
+      if (!window.open(location.href.split('#')[0] + encodeView(done), '_blank')) {
         $('error').textContent = 'ポップアップがブロックされました。許可してからもう一度押してください。';
       }
     }
@@ -350,8 +350,7 @@
           <b>抽選結果：${totalRounds}ラウンド・合計${total}試合</b>
           <span>
             <button class="secondary" data-action="again" type="button">再抽選</button>
-            <button class="secondary" data-action="view" type="button">別タブで表示</button>
-            <button class="secondary" data-action="print" type="button">印刷</button>
+            <button class="secondary" data-action="view" type="button">別画面固定表示</button>
           </span>
         </div>
         ${requested !== total
@@ -397,6 +396,7 @@
 
     // 「次のラウンドを作成」ボタン：直前のラウンドが未完了でも押せる
     function updateNextArea(lastDone) {
+      if (session.mode === 'view') return; // 別タブ表示には次のラウンド作成はない
       const created = session.rounds.length;
       if (created >= session.totalRounds) {
         $('nextArea').innerHTML = '<p class="hint">全ラウンドを作成しました。</p>';
@@ -435,6 +435,11 @@
       });
       for (let i = 1; i <= session.n; i++) {
         $('done-count-' + i).textContent = tally[i] + '回';
+      }
+
+      // 別タブ表示では、更新しても完了状況が残るよう URL に保存する
+      if (session.mode === 'view') {
+        history.replaceState(null, '', location.pathname + location.search + encodeView([...doneNos].sort((a, b) => a - b)));
       }
 
       // 最後に作ったラウンドが全て完了か
@@ -570,13 +575,12 @@
     results.addEventListener('click', e => {
       const card = e.target.closest('.match');
       if (card) {
-        if (card.querySelector('.match-check')) toggleMatch(card); // 別タブ表示の枠は対象外
+        toggleMatch(card);
         return;
       }
       const action = e.target.dataset.action;
       if (action === 'again') draw(e.target);
       if (action === 'view') openInNewTab();
-      if (action === 'print') window.print();
       if (action === 'next') {
         const no = addRound();
         $('round-' + no).scrollIntoView({ behavior: 'smooth' });
