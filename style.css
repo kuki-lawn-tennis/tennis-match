@@ -14,8 +14,6 @@
   --green: #176b45;          /* 背景に使う緑（ヘッダー・主ボタン） */
   --on-green: #fff;          /* 緑の上の文字 */
   --green-text: #176b45;     /* 面の上に置く緑（文字・チェック・枠） */
-  --btn-soft: #e8f0eb;
-  --btn-soft-text: #145638;
 
   --input-bg: #fff;
   --input-text: #000;
@@ -44,8 +42,6 @@
     --green: #1f7a50;
     --on-green: #fff;
     --green-text: #5fd39b;
-    --btn-soft: #26352c;
-    --btn-soft-text: #bfe8d2;
 
     --input-bg: #101612;
     --input-text: #e6efe9;
@@ -178,13 +174,8 @@ button {
   width: 100%;
   margin-top: 14px;
 }
-.secondary {
-  background: var(--btn-soft);
-  color: var(--btn-soft-text);
-}
 .wide {
-  width: 100%;
-  margin-top: 10px;
+  margin-top: 10px; /* 作成ボタンの下に続けて置くときの間隔 */
 }
 button:disabled {
   opacity: 0.45;
