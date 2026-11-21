@@ -29,8 +29,8 @@
   --done-border: #9bc5a8;
 }
 
-/* ダーク（画面表示のみ。印刷は常にライト） */
-@media screen and (prefers-color-scheme: dark) {
+/* ダーク（端末の設定がダークのときだけ、上の色を差し替える） */
+@media (prefers-color-scheme: dark) {
   :root {
     --bg: #101612;
     --surface: #18211b;
@@ -348,34 +348,5 @@ td.done-cell {
 @media (max-width: 500px) {
   .fields {
     grid-template-columns: 1fr;
-  }
-}
-
-@media print {
-  :root {
-    color-scheme: light;
-  }
-  header {
-    background: #fff;
-    color: #000;
-  }
-  header .hint {
-    color: #000;
-  }
-  main {
-    margin: 0;
-  }
-  .panel:first-child,
-  .toolbar button,
-  .match-bottom,
-  .all-check-label,
-  .next-area {
-    display: none;
-  }
-  .panel {
-    border: 0;
-  }
-  .match {
-    break-inside: avoid;
   }
 }
