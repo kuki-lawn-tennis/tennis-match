@@ -174,13 +174,6 @@ button {
   width: 100%;
   margin-top: 14px;
 }
-.wide {
-  margin-top: 10px; /* 作成ボタンの下に続けて置くときの間隔 */
-}
-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
 
 /* ---------- 結果ヘッダー ---------- */
 .stats {
