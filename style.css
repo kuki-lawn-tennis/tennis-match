@@ -182,16 +182,16 @@ button {
   background: var(--btn-soft);
   color: var(--btn-soft-text);
 }
-
-/* ---------- 結果ヘッダー ---------- */
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+.wide {
+  width: 100%;
+  margin-top: 10px;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
+/* ---------- 結果ヘッダー ---------- */
 .stats {
   display: flex;
   gap: 8px;
