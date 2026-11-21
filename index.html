@@ -37,7 +37,6 @@
         一括作成は、全ラウンドを最初にまとめて作成します。
       </p>
       <button class="primary" id="generate" type="button">組み合わせを作成</button>
-      <button class="primary wide" id="openView" type="button" disabled>別画面結果表示</button>
       <p id="error" class="hint error" role="alert"></p>
     </section>
 
@@ -238,28 +237,37 @@
         </div>`;
     }
 
-    /* ---------- 別タブ表示 ----------
-       抽選結果と完了状況を URL の # 以降に入れて、同じページを「結果の表示」で開く。
-       更新しても同じ内容が出て、スタイルも同じ style.css をそのまま使える。
-       形式：#view=コート数/人数/ラウンド（~区切り）&done=完了した試合番号（,区切り）
+    /* ---------- 状態の保存・復元 ----------
+       抽選結果・入力値・完了状況を URL の # 以降に保存する。
+       更新（再読み込み）しても同じ画面に戻り、URL を保存・共有すれば同じ結果を開ける。
+       形式：#s=コート数/人数/モード(s=順次,b=一括)/入力試合数/ラウンド（~区切り）&done=完了した試合番号（,区切り）
              ラウンドは試合（,区切り）、試合は「A1-A2.B1-B2」 */
-    function encodeView(done = []) {
+    function encodeState(done) {
       const rounds = session.rounds
         .map(r => r.matches.map(m => m.teamA.join('-') + '.' + m.teamB.join('-')).join(','))
         .join('~');
-      return '#view=' + session.courts + '/' + session.n + '/' + rounds +
+      return '#s=' + [session.courts, session.n, session.mode === 'bulk' ? 'b' : 's', session.requested, rounds].join('/') +
         (done.length ? '&done=' + done.join(',') : '');
     }
 
-    // 不正な値なら null を返す（通常の画面を表示する）
-    function decodeView(hash) {
-      const m = /^#view=(\d+)\/(\d+)\/([\d.,~-]+)(?:&done=([\d,]*))?$/.exec(hash);
-      if (!m) return null;
-      const courts = Number(m[1]), n = Number(m[2]);
-      if (courts < 1 || n < courts * 4) return null;
+    // 入力欄の min / max の範囲内か
+    function inRange(id, value) {
+      const el = $(id);
+      return Number.isInteger(value) && value >= Number(el.min) && value <= Number(el.max);
+    }
 
+    // 不正な値なら null を返す（初期画面のままにする）
+    function decodeState(hash) {
+      const m = /^#s=(\d+)\/(\d+)\/([sb])\/(\d+)\/([\d.,~-]+)(?:&done=([\d,]*))?$/.exec(hash);
+      if (!m) return null;
+      const courts = Number(m[1]), n = Number(m[2]), requested = Number(m[4]);
+      const mode = m[3] === 'b' ? 'bulk' : 'seq';
+      if (!inRange('courts', courts) || !inRange('players', n) || !inRange('totalMatches', requested)) return null;
+      if (n < courts * 4) return null;
+
+      const totalRounds = Math.ceil(requested / courts);
       const rounds = [];
-      for (const text of m[3].split('~')) {
+      for (const text of m[5].split('~')) {
         const matches = text.split(',').map((t, c) => {
           const teams = t.split('.').map(x => x.split('-').map(Number));
           return { no: rounds.length * courts + c + 1, court: c + 1, teamA: teams[0], teamB: teams[1] };
@@ -274,45 +282,30 @@
         const used = new Set(ids);
         rounds.push({ matches, waiting: Array.from({ length: n }, (_, i) => i + 1).filter(x => !used.has(x)) });
       }
+      // 作成済みのラウンド数は、総ラウンド数以下（一括作成は全ラウンドが揃っている）
+      if (rounds.length > totalRounds || (mode === 'bulk' && rounds.length !== totalRounds)) return null;
 
-      const done = m[4] ? m[4].split(',').map(Number) : [];
+      const done = m[6] ? m[6].split(',').map(Number) : [];
       if (done.some(no => !Number.isInteger(no) || no < 1 || no > rounds.length * courts)) return null;
-      return { courts, n, rounds, done };
+      return { courts, n, mode, requested, totalRounds, rounds, done };
     }
 
-    // 別タブの表示：完了のチェックと参加者別の試合数も、元の画面と同じように使える
-    function showView(view) {
-      const { courts, n, rounds, done } = view;
-      const title = '抽選結果（コート' + courts + '・' + n + '人）';
+    // 保存した状態を画面に戻す
+    function restoreState(state) {
+      const { courts, n, mode, requested, totalRounds, rounds, done } = state;
+      $('courts').value = courts;
+      $('players').value = n;
+      $('totalMatches').value = requested;
+      document.querySelector('input[name="mode"][value="' + mode + '"]').checked = true;
 
-      session = { courts, n, totalRounds: rounds.length, rounds, mode: 'view', requested: rounds.length * courts };
-      matchByNo = new Map(rounds.flatMap(r => r.matches).map(m => [m.no, m]));
-
-      document.title = title;
-      document.querySelector('header h1').textContent = title;
-      document.querySelector('header .hint').hidden = true;
-      document.querySelector('main > .panel').hidden = true; // 入力フォーム
-      $('results').innerHTML = `
-        <div class="stats">
-          <div class="stat"><small>合計試合数</small><b>${rounds.length * courts}</b></div>
-          <div class="stat"><small>完了試合数</small><b id="doneCount">0</b></div>
-        </div>
-        <label class="all-check-label">
-          <input type="checkbox" id="checkAll"> 全試合を一括で完了にする
-        </label>
-        <div id="rounds">${rounds.map(renderRound).join('')}</div>
-        ${renderCountTable(n)}`;
+      session = { courts, n, totalRounds, rounds: [], mode, requested };
+      matchByNo = new Map();
+      renderResults(requested);
+      showAllRounds(rounds);
 
       const doneSet = new Set(done);
       document.querySelectorAll('.match-check').forEach(x => { x.checked = doneSet.has(Number(x.dataset.match)); });
       updateProgress();
-    }
-
-    function openInNewTab() {
-      const done = [...document.querySelectorAll('.match-check:checked')].map(x => Number(x.dataset.match));
-      if (!window.open(location.href.split('#')[0] + encodeView(done), '_blank')) {
-        $('error').textContent = 'ポップアップがブロックされました。許可してからもう一度押してください。';
-      }
     }
 
     function renderRound(round, index) {
@@ -391,7 +384,6 @@
 
     // 「次のラウンドを作成」ボタン：直前のラウンドが未完了でも押せる
     function updateNextArea(lastDone) {
-      if (session.mode === 'view') return; // 別タブ表示には次のラウンド作成はない
       const created = session.rounds.length;
       if (created >= session.totalRounds) {
         $('nextArea').innerHTML = '<p class="hint">全ラウンドを作成しました。</p>';
@@ -432,10 +424,9 @@
         $('done-count-' + i).textContent = tally[i] + '回';
       }
 
-      // 別タブ表示では、更新しても完了状況が残るよう URL に保存する
-      if (session.mode === 'view') {
-        history.replaceState(null, '', location.pathname + location.search + encodeView([...doneNos].sort((a, b) => a - b)));
-      }
+      // 更新しても同じ画面に戻れるよう、状態を URL に保存する
+      history.replaceState(null, '', location.pathname + location.search +
+        encodeState([...doneNos].sort((a, b) => a - b)));
 
       // 最後に作ったラウンドが全て完了か
       const last = session.rounds[session.rounds.length - 1];
@@ -525,7 +516,6 @@
         session = { courts, n, totalRounds, rounds: [], mode, requested };
         matchByNo = new Map();
         renderResults(requested);
-        $('openView').disabled = false; // 組み合わせができてから使える
         if (mode === 'bulk') {
           showAllRounds(buildAll(courts, n, totalRounds)); // 全ラウンドを一度に作る
         } else {
@@ -538,11 +528,6 @@
     }
 
     $('generate').addEventListener('click', e => draw(e.currentTarget));
-    $('openView').addEventListener('click', openInNewTab);
-
-    // 別タブ（#view=...）で開かれたときは、結果だけを表示する
-    const view = decodeView(location.hash);
-    if (view) showView(view);
 
     // 試合の枠をタッチ（クリック）すると、完了／取り消しを切り替える
     // （完了の状態は、見えない .match-check に持たせている）
@@ -581,6 +566,10 @@
         $('round-' + no).scrollIntoView({ behavior: 'smooth' });
       }
     });
+
+    // 保存された状態（#s=...）があれば、前回の画面に戻す
+    const saved = decodeState(location.hash);
+    if (saved) restoreState(saved);
   })();
   </script>
 </body>
