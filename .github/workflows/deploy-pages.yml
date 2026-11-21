@@ -33,16 +33,17 @@ jobs:
 
       - name: Check required files
         run: |
-          for f in index.html style.css; do
+          for f in index.html style.css help.html; do
             test -f "$f" || { echo "::error::$f がありません"; exit 1; }
           done
           grep -q 'href="style.css"' index.html || { echo "::error::index.html が style.css を読み込んでいません"; exit 1; }
+          grep -q 'href="help.html"' index.html || { echo "::error::index.html に使用説明へのリンクがありません"; exit 1; }
 
       # 公開に必要なファイルだけを _site に集める（.github などは公開しない）
       - name: Build site
         run: |
           mkdir _site
-          cp index.html style.css _site/
+          cp index.html style.css help.html _site/
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
