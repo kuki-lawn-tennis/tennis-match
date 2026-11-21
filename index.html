@@ -37,6 +37,7 @@
         一括作成は、全ラウンドを最初にまとめて作成します。
       </p>
       <button class="primary" id="generate" type="button">組み合わせを作成</button>
+      <button class="secondary wide" id="openView" type="button" disabled>別画面固定表示</button>
       <p id="error" class="hint error" role="alert"></p>
     </section>
 
@@ -346,13 +347,7 @@
       const { courts, n, totalRounds } = session;
       const total = totalRounds * courts;
       $('results').innerHTML = `
-        <div class="toolbar">
-          <b>抽選結果：${totalRounds}ラウンド・合計${total}試合</b>
-          <span>
-            <button class="secondary" data-action="again" type="button">再抽選</button>
-            <button class="secondary" data-action="view" type="button">別画面固定表示</button>
-          </span>
-        </div>
+        <b>抽選結果：${totalRounds}ラウンド・合計${total}試合</b>
         ${requested !== total
           ? `<p class="hint">入力された${requested}試合を、全コートを使い切る${total}試合（${totalRounds}ラウンド）に調整しました。</p>`
           : ''}
@@ -530,6 +525,7 @@
         session = { courts, n, totalRounds, rounds: [], mode, requested };
         matchByNo = new Map();
         renderResults(requested);
+        $('openView').disabled = false; // 組み合わせができてから使える
         if (mode === 'bulk') {
           showAllRounds(buildAll(courts, n, totalRounds)); // 全ラウンドを一度に作る
         } else {
@@ -542,6 +538,7 @@
     }
 
     $('generate').addEventListener('click', e => draw(e.currentTarget));
+    $('openView').addEventListener('click', openInNewTab);
 
     // 別タブ（#view=...）で開かれたときは、結果だけを表示する
     const view = decodeView(location.hash);
@@ -579,8 +576,6 @@
         return;
       }
       const action = e.target.dataset.action;
-      if (action === 'again') draw(e.target);
-      if (action === 'view') openInNewTab();
       if (action === 'next') {
         const no = addRound();
         $('round-' + no).scrollIntoView({ behavior: 'smooth' });
