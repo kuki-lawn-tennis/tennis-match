@@ -334,3 +334,50 @@ td.done-cell {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- 使い方ページ ---------- */
+.help-link {
+  margin: 6px 0 0;
+  font-size: 15px;
+}
+.help-link a {
+  color: var(--on-green);
+  font-weight: 700;
+}
+
+.help p,
+.help li {
+  font-size: 16px;
+  line-height: 1.8;
+}
+.help h2 {
+  margin: 28px 0 8px;
+  font-size: 20px;
+  color: var(--green-text);
+}
+.help > p:first-child {
+  margin-top: 0;
+}
+.help ul,
+.help ol {
+  margin: 8px 0;
+  padding-left: 1.5em;
+}
+.help table {
+  margin: 8px 0 12px;
+  font-size: 15px;
+}
+.help th,
+.help td {
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.7;
+}
+.help th {
+  background: var(--soft);
+}
+.help code {
+  background: var(--soft);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
