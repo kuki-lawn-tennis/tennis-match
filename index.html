@@ -48,6 +48,12 @@
     </section>
   </main>
 
+  <!-- 右下に浮かぶ移動ボタン（抽選結果があるときだけ表示） -->
+  <div class="fab" id="fab" hidden>
+    <button type="button" id="toTop" aria-label="一番上へ移動" title="一番上へ">▲</button>
+    <button type="button" id="toBottom" aria-label="一番下へ移動" title="一番下へ">▼</button>
+  </div>
+
   <dialog id="resetDialog" aria-labelledby="resetText">
     <p id="resetText" class="dialog-text">入力した内容と抽選結果をすべて消して、初期画面に戻します。よろしいですか？</p>
     <div class="dialog-actions">
@@ -348,9 +354,16 @@
         </div>`;
     }
 
+    // 移動ボタンの表示／非表示（ボタンに隠れないよう、下の余白も切り替える）
+    function showFab(visible) {
+      $('fab').hidden = !visible;
+      document.body.classList.toggle('has-fab', visible);
+    }
+
     function renderResults(requested) {
       const { courts, n, totalRounds } = session;
       const total = totalRounds * courts;
+      showFab(true);
       $('results').innerHTML = `
         <b>抽選結果：${totalRounds}ラウンド・合計${total}試合</b>
         ${requested !== total
@@ -550,6 +563,7 @@
       document.querySelectorAll('input[name="mode"]').forEach(el => { el.checked = el.defaultChecked; });
       $('error').textContent = '';
       $('results').innerHTML = initialResults;
+      showFab(false);
       history.replaceState(null, '', location.pathname + location.search);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -560,6 +574,14 @@
     $('resetOk').addEventListener('click', () => {
       $('resetDialog').close();
       resetAll();
+    });
+
+    // 移動ボタン：一番上／一番下へなめらかに移動
+    $('toTop').addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    $('toBottom').addEventListener('click', () => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
     });
 
     // 試合の枠をタッチ（クリック）すると、完了／取り消しを切り替える
