@@ -184,6 +184,34 @@ button {
   margin-top: 10px;
 }
 
+/* ---------- 右下の移動ボタン ---------- */
+.fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fab[hidden] {
+  display: none;
+}
+.fab button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--green);
+  color: var(--on-green);
+  font-size: 18px;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+/* 移動ボタンが最後の内容に重ならないよう、下に余白を足す */
+.has-fab main {
+  padding-bottom: 130px;
+}
+
 /* ---------- 初期化の確認画面 ---------- */
 dialog {
   width: calc(100% - 32px);
