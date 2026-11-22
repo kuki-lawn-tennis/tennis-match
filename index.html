@@ -39,6 +39,7 @@
         一括作成は、全ラウンドを最初にまとめて作成します。
       </p>
       <button class="primary" id="generate" type="button">組み合わせを作成</button>
+      <button class="soft reset" id="reset" type="button">初期化</button>
       <p id="error" class="hint error" role="alert"></p>
     </section>
 
@@ -47,6 +48,14 @@
     </section>
   </main>
 
+  <dialog id="resetDialog" aria-labelledby="resetText">
+    <p id="resetText" class="dialog-text">入力した内容と抽選結果をすべて消して、初期画面に戻します。よろしいですか？</p>
+    <div class="dialog-actions">
+      <button class="soft" id="resetCancel" type="button">キャンセル</button>
+      <button class="primary" id="resetOk" type="button">OK</button>
+    </div>
+  </dialog>
+
   <script>
   (() => {
     'use strict';
@@ -54,6 +63,7 @@
     const $ = id => document.getElementById(id);
     let session = null;        // { courts, n, totalRounds, rounds: [], mode: 'bulk' | 'seq', requested }
     let matchByNo = new Map(); // 試合番号 → 試合
+    const initialResults = $('results').innerHTML; // 初期画面の結果エリア（初期化で戻す）
 
     /* ---------- ユーティリティ ---------- */
     function shuffle(array) {
@@ -530,6 +540,27 @@
     }
 
     $('generate').addEventListener('click', e => draw(e.currentTarget));
+
+    // 初期化：入力値・抽選結果・完了チェック・保存された URL をすべて消して、初期画面に戻す
+    function resetAll() {
+      disarm();
+      session = null;
+      matchByNo = new Map();
+      document.querySelectorAll('input[type=number]').forEach(el => { el.value = el.defaultValue; });
+      document.querySelectorAll('input[name="mode"]').forEach(el => { el.checked = el.defaultChecked; });
+      $('error').textContent = '';
+      $('results').innerHTML = initialResults;
+      history.replaceState(null, '', location.pathname + location.search);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // 確認画面（<dialog>）：OK で初期化、キャンセルや Esc では何もしない
+    $('reset').addEventListener('click', () => $('resetDialog').showModal());
+    $('resetCancel').addEventListener('click', () => $('resetDialog').close());
+    $('resetOk').addEventListener('click', () => {
+      $('resetDialog').close();
+      resetAll();
+    });
 
     // 試合の枠をタッチ（クリック）すると、完了／取り消しを切り替える
     // （完了の状態は、見えない .match-check に持たせている）
